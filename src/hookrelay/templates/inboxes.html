@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Inboxes &middot; {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Inboxes</h1>
+
+<div class="grid">
+  <div class="kpi"><div class="n">{{ counts.inboxes }}</div><div class="l">inboxes</div></div>
+  <div class="kpi"><div class="n">{{ counts.events }}</div><div class="l">events</div></div>
+  <div class="kpi"><div class="n">{{ counts.rules }}</div><div class="l">rules</div></div>
+</div>
+
+<div class="card">
+  <form method="post" action="{{ url_for('new_inbox') }}">
+    <label>New inbox name
+      <input name="name" placeholder="github">
+    </label>
+    <button type="submit">Create inbox</button>
+  </form>
+</div>
+
+{% if inboxes %}
+<div class="card">
+  <table>
+    <thead>
+      <tr><th>#</th><th>Name</th><th>Token</th><th>Collector URL</th>
+          <th>Events</th><th>Rules</th><th>Created</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+    {% for i in inboxes %}
+      <tr>
+        <td class="mono">{{ i.id }}</td>
+        <td>{{ i.name }}</td>
+        <td class="mono">{{ i.token }}</td>
+        <td class="mono">/h/{{ i.token }}</td>
+        <td><a href="{{ url_for('index', inbox=i.token) }}">{{ i.events }}</a></td>
+        <td>{{ i.rules }}</td>
+        <td class="mono muted">{{ i.created_at.strftime("%Y-%m-%d %H:%M") if i.created_at else "—" }}</td>
+        <td>
+          <div class="row">
+            <a href="{{ url_for('index', inbox=i.token) }}"><button type="button" class="ghost">Open</button></a>
+            <form method="post" action="{{ url_for('delete_inbox', iid=i.id) }}">
+              <button type="submit" class="danger">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">No inboxes yet. Create one above or run
+  <span class="mono">python cli.py inbox-create --name stripe</span>.</div>
+{% endif %}
+
+<h2>Rules</h2>
+<div class="card">
+  <p class="muted" style="margin:0">
+    Rules are registered through the API:
+    <span class="mono">POST /api/rules</span> with
+    <span class="mono">{"inbox_id":1,"match":{"body_contains":"stripe.succeeded"},
+    "forward_url":"https://&hellip;","hmac_secret":"whsec_&hellip;"}</span>.
+    Matches are forwarded with an <span class="mono">X-Hook-Signature</span>
+    HMAC-SHA256 header.
+  </p>
+</div>
+{% endblock %}

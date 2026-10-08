@@ -1,0 +1,152 @@
+openapi: 3.0.0
+info:
+  title: "📡 hookrelay"
+  version: 0.1.0
+  description: >-
+    Webhook relay and debugger: every request to an inbox URL is captured,
+    listed, searchable, and can be replayed to the inbox's matching rules.
+paths:
+  /api/health:
+    get:
+      summary: liveness probe
+      responses:
+        "200":
+          description: ok
+  /api/inboxes:
+    get:
+      summary: list inboxes with their event and rule counts
+      responses:
+        "200":
+          description: ok
+    post:
+      summary: create an inbox
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+      responses:
+        "200":
+          description: ok
+  /api/events:
+    get:
+      summary: list captured events, newest first
+      description: >-
+        Without an inbox token this lists events across every inbox. With
+        ?inbox=<token> it lists only that inbox's events and answers 404 when
+        the token does not exist.
+      parameters:
+        - name: inbox
+          in: query
+          required: false
+          schema: {type: string}
+        - name: q
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        "200":
+          description: ok
+        "404":
+          description: no inbox with that token
+  /api/events/{id}/replay:
+    post:
+      summary: re-deliver one captured event to its matching rules
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        "200":
+          description: ok
+  /api/rules:
+    post:
+      summary: add a forwarding rule to an inbox
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                inbox: {type: string}
+                match: {type: object}
+                forward_url: {type: string}
+                hmac_secret: {type: string}
+      responses:
+        "200":
+          description: ok
+  /h/{token}:
+    get:
+      summary: capture a webhook request
+      responses:
+        "200":
+          description: captured; body is the stored event
+        "404":
+          description: no inbox with that token
+    post:
+      summary: capture a webhook request
+      responses:
+        "200":
+          description: captured; body is the stored event
+        "404":
+          description: no inbox with that token
+    put:
+      summary: capture a webhook request
+      responses:
+        "200":
+          description: captured
+        "404":
+          description: no inbox with that token
+    patch:
+      summary: capture a webhook request
+      responses:
+        "200":
+          description: captured
+        "404":
+          description: no inbox with that token
+    delete:
+      summary: capture a webhook request
+      responses:
+        "200":
+          description: captured
+        "404":
+          description: no inbox with that token
+  /inboxes:
+    get:
+      summary: HTML inbox dashboard
+      responses:
+        "200":
+          description: text/html
+  /inboxes/new:
+    post:
+      summary: create an inbox from the HTML form
+      responses:
+        "302":
+          description: redirect to the inbox list
+  /inboxes/{id}/delete:
+    post:
+      summary: delete an inbox from the HTML form
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        "302":
+          description: redirect to the inbox list
+  /events/{id}/delete:
+    post:
+      summary: delete a captured event from the HTML form
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        "302":
+          description: redirect to the inbox list

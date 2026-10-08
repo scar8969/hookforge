@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Events &middot; {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Captured events{% if current %} &middot; <span class="mono">{{ current.name or "(unnamed)" }}</span>{% endif %}</h1>
+
+<div class="grid">
+  <div class="kpi"><div class="n">{{ counts.inboxes }}</div><div class="l">inboxes</div></div>
+  <div class="kpi"><div class="n">{{ counts.events }}</div><div class="l">events{% if current %} (this inbox){% endif %}</div></div>
+  <div class="kpi"><div class="n">{{ counts.rules }}</div><div class="l">rules{% if current %} (this inbox){% endif %}</div></div>
+</div>
+
+{% if current %}
+<div class="card">
+  <div class="row">
+    <span class="muted">Collector URL</span>
+    <code>/h/{{ current.token }}</code>
+    <span class="muted">Any method, up to 1&nbsp;MB body.</span>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <form method="get" action="{{ url_for('index') }}">
+    <label>Inbox
+      <select name="inbox">
+        {% for i in inboxes %}
+          <option value="{{ i.token }}"{% if current and i.token == current.token %} selected{% endif %}>
+            {{ i.name }} ({{ i.token }}) &mdash; {{ i.events }} events
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Search body / path
+      <input name="q" value="{{ q }}" placeholder="stripe.succeeded">
+    </label>
+    <button type="submit">Filter</button>
+    <a href="{{ url_for('index') }}"><button type="button" class="ghost">Reset</button></a>
+  </form>
+</div>
+
+<div class="card">
+  <form method="post" action="{{ url_for('new_inbox') }}">
+    <label>New inbox name
+      <input name="name" placeholder="stripe">
+    </label>
+    <button type="submit">Create inbox</button>
+  </form>
+</div>
+
+<h2>Latest events</h2>
+{% if events %}
+<div class="card">
+  <table>
+    <thead>
+      <tr><th>#</th><th>Method</th><th>Path</th><th>Status</th><th>ms</th>
+          <th>IP</th><th>At</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+    {% for e in events %}
+      <tr>
+        <td class="mono">{{ e.id }}</td>
+        <td><span class="tag">{{ e.method }}</span></td>
+        <td class="mono">{{ e.path }}</td>
+        <td>{{ e.status }}</td>
+        <td>{{ e.ms }}</td>
+        <td class="mono muted">{{ e.ip or "—" }}</td>
+        <td class="mono muted">{{ e.at.strftime("%Y-%m-%d %H:%M:%S") if e.at else "—" }}</td>
+        <td>
+          <form method="post" action="{{ url_for('delete_event', eid=e.id) }}">
+            <button type="submit" class="danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="8">
+          {% if e.headers %}
+            <details>
+              <summary class="muted">Headers ({{ e.headers|length }})</summary>
+              <pre>{{ e.headers|pprint }}</pre>
+            </details>
+          {% endif %}
+          {% if e.body %}
+            <pre>{{ e.body }}{% if e.truncated %}
+&hellip; truncated{% endif %}</pre>
+          {% else %}
+            <span class="muted">No body.</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  No events captured yet. Create an inbox above, then point a webhook at
+  <code>/h/&lt;token&gt;</code> or post one by hand:
+  <code>curl -X POST http://127.0.0.1:5000/h/&lt;token&gt; -d '{"type":"ping"}'</code>.
+</div>
+{% endif %}
+
+<h2>Replay</h2>
+<div class="card">
+  <p class="muted" style="margin:0">
+    Replay re-sends a captured event to every enabled rule of its inbox and prints
+    the outcome. Use <span class="mono">python cli.py replay &lt;event_id&gt;</span>
+    or <span class="mono">POST /api/events/&lt;id&gt;/replay</span>.
+  </p>
+</div>
+{% endblock %}
