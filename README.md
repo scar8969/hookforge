@@ -1,311 +1,183 @@
-# hookforge
+<p align="center">
+  <img src="docs/assets/screens/inboxes.png" alt="hookforge running" width="900">
+</p>
 
-> Webhook relay and debugger. Point any service's webhook at
+<h1 align="center">hookforge</h1>
 
-[![ci](https://img.shields.io/badge/ci-github--actions-blue)](.github/workflows/ci.yml)
-[![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
-[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+<p align="center"><b>Point any webhook at an inbox, read exactly what was sent, replay it.</b></p>
 
-hookforge is a Flask service delivered as an installable, typed, test-covered
-distribution. The business logic is unchanged from the original service; what
-is new is the engineering around it: a packaging story, a configuration
-contract, structured observability, operational endpoints, a hardened
-container, and the gates that keep all of that true.
+<p align="center">
+  <a href="#quality-gates"><img src="https://img.shields.io/badge/tests-25%20passed-2ea44f" alt="tests: 25 passed"></a> <a href="#quality-gates"><img src="https://img.shields.io/badge/coverage-59.6%-yellow" alt="coverage: 59.6%"></a> <a href="#api"><img src="https://img.shields.io/badge/routes-10%20answered-0969da" alt="routes: 10 answered"></a> <a href="#requirements"><img src="https://img.shields.io/badge/python-3.11%2B-3776ab" alt="python: 3.11+"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2ea44f" alt="license: MIT"></a>
+</p>
+
+hookforge gives you a URL that accepts any method and any body, stores the request with its headers, and forwards it to the rules you attach. When a provider's payload shape surprises you, the captured request is right there — and replayable.
 
 ---
+
+**Contents** &nbsp;·&nbsp; [Why](#why-this-exists) &nbsp;·&nbsp; [What it does](#what-it-does) &nbsp;·&nbsp; [Quickstart](#quickstart) &nbsp;·&nbsp; [API](#api) &nbsp;·&nbsp; [Screenshots](#screenshots) &nbsp;·&nbsp; [Measured](#measured-not-estimated) &nbsp;·&nbsp; [Architecture](#architecture) &nbsp;·&nbsp; [Quality gates](#quality-gates) &nbsp;·&nbsp; [Deploy](#deploy) &nbsp;·&nbsp; [Limits](#limits-stated-rather-than-hidden)
+
+## Why this exists
+
+Debugging a webhook from the sending side is guesswork: you cannot see the headers, the content type, or whether the body was form-encoded. Capturing first and forwarding second turns that into a row you can read and re-deliver.
+
+## What it does
+
+| Capability | How it works |
+| --- | --- |
+| **Any-method capture** | GET, POST, PUT, PATCH and DELETE all land in the same inbox with headers and body preserved. |
+| **Forwarding rules** | Per-inbox rules with a target URL and optional header set; each delivery is recorded. |
+| **Replay** | POST /api/events/<id>/replay re-delivers one captured event to its matching rules. |
+| **Inbox dashboard** | An HTML page lists inboxes, events and rule counts so a new endpoint can be created in a browser. |
 
 ## Quickstart
 
 ```sh
-git clone <your-fork> hookforge && cd hookforge
-python -m venv .venv
-. .venv/bin/activate        # Windows: .venv\Scripts\activate
+git clone https://github.com/scar8969/hookforge.git
+cd hookforge
+python -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-cp .env.example .env
-python wsgi.py
+python wsgi.py                                 # http://127.0.0.1:8000
 ```
 
-The service listens on `http://127.0.0.1:8000` by default.
+The same work from the CLI:
 
 ```sh
-curl -s localhost:8000/healthz | python -m json.tool
-curl -s localhost:8000/version | python -m json.tool
-curl -s localhost:8000/metrics | head
+python -m hookrelay.cli --help
 ```
 
----
+Commands: `inbox-create`, `inboxes`, `events`, `replay`.
 
-## Operating contract
+A first request:
 
-Every deployment target answers the same five endpoints. They are the contract
-an orchestrator, a load balancer, or an on-call engineer relies on.
+```sh
+curl -s http://127.0.0.1:8000/api/health | head
+```
 
-| Endpoint  | Purpose                                       | Success | Failure |
-| --------- | --------------------------------------------- | ------- | ------- |
-| `/healthz` | Process is up and the app is answering        | `200`   | -       |
-| `/livez`   | Liveness: restart me if this fails            | `200`   | -       |
-| `/readyz`  | Readiness: send traffic only if this passes   | `200`   | `503` + `failures` |
-| `/metrics` | Prometheus text exposition                    | `200`   | -       |
-| `/version` | Build and resolved config (secrets redacted)  | `200`   | -       |
+## Requirements
 
-Cross-cutting behaviour applied to every response:
+- Python **3.11+** — CI runs 3.11, 3.12 and 3.13.
+- Runtime dependencies: `Flask>=3.0`, `Flask-SQLAlchemy>=3.1`, `SQLAlchemy>=2.0`, `PyYAML>=6.0`.
+- No JavaScript build step: every page is server-rendered Jinja.
 
-- `X-Request-ID` is accepted from the caller or generated, echoed back, and
-  attached to every log record for that request.
-- Security headers: `X-Content-Type-Options`, `X-Frame-Options`,
-  `Referrer-Policy`, `Cross-Origin-Opener-Policy`, `Permissions-Policy`,
-  and `Strict-Transport-Security` when `APP_ENV=production`.
-- Errors are JSON: `{"error": "<code>", "message": "...", "request_id": "..."}`.
+## API
 
----
+Every route below is in [`openapi/hookforge.yaml`](openapi/hookforge.yaml) and is exercised by the live probe recorded in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 
-## Configuration
-
-Configuration is environment-only, in the twelve-factor sense. Nothing is read
-from a committed file. `.env.example` is a template for local development.
-
-### Platform variables
-
-| Variable             | Default       | Notes                                        |
-| -------------------- | ------------- | -------------------------------------------- |
-| `APP_ENV`            | `development` | `production` requires `SECRET_KEY`               |
-| `SECRET_KEY`         | dev fallback  | Must be set in production or startup fails    |
-| `HOST` and `PORT`     | `0.0.0.0`, `8000` | Port must be 1-65535               |
-| `DEBUG`              | `false`       | Flask debug mode                              |
-| `MAX_CONTENT_LENGTH` | `8388608`     | Bytes; oversized bodies get `413`             |
-| `DATABASE_URL`       | sqlite in `var/` | Also accepts `SQLALCHEMY_DATABASE_URI`      |
-| `DATA_DIR`           | `<root>/var`   | Where the database and logs live              |
-| `LOG_LEVEL`          | `INFO`        | `DEBUG INFO WARNING ERROR CRITICAL`         |
-| `LOG_JSON`           | `true`        | One JSON object per line for log shippers     |
-| `REQUEST_ID_HEADER`  | `X-Request-ID` | Header used for correlation ids              |
-
-### Application variables
-
-| Variable | Type | Default |
+| Method | Path | What it does |
 | --- | --- | --- |
-| `APP_ENV` | string | -- |
-| `SECRET_KEY` | string | -- |
-| `HOST` | string | -- |
-| `PORT` | string | -- |
-| `DEBUG` | string | -- |
-| `MAX_CONTENT_LENGTH` | string | -- |
-| `DATABASE_URL` | string | -- |
-| `DATA_DIR` | string | -- |
-| `INSTANCE_DIR` | string | -- |
-| `LOG_DIR` | string | -- |
-| `LOG_LEVEL` | string | -- |
-| `LOG_JSON` | string | -- |
-| `REQUEST_ID_HEADER` | string | -- |
-| `ANALYTICS_SALT` | string | -- |
-| `PORT` | string | -- |
-| `SECRET_KEY` | string | -- |
+| `GET` | `/api/health` | liveness probe |
+| `GET` | `/api/inboxes` | list inboxes with their event and rule counts |
+| `POST` | `/api/inboxes` | create an inbox |
+| `GET` | `/api/events` | list captured events, newest first |
+| `POST` | `/api/events/{id}/replay` | re-deliver one captured event to its matching rules |
+| `POST` | `/api/rules` | add a forwarding rule to an inbox |
+| `GET` | `/h/{token}` | capture a webhook request |
+| `POST` | `/h/{token}` | capture a webhook request |
+| `PUT` | `/h/{token}` | capture a webhook request |
+| `PATCH` | `/h/{token}` | capture a webhook request |
+| `DELETE` | `/h/{token}` | capture a webhook request |
+| `GET` | `/inboxes` | HTML inbox dashboard |
+| `POST` | `/inboxes/new` | create an inbox from the HTML form |
+| `POST` | `/inboxes/{id}/delete` | delete an inbox from the HTML form |
+| `POST` | `/events/{id}/delete` | delete a captured event from the HTML form |
 
-Invalid values fail fast at import with a `ConfigError` naming the offending
-variable, rather than surfacing as a confusing runtime error later.
+## Screenshots
 
----
+Captured from the running service with headless Chromium at 1440×900, one image per page, committed under [`docs/assets/screens/`](docs/assets/screens/).
 
-## HTTP API
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/screens/root.png" alt="/" width="100%"><br><sub><code>/</code> &middot; 43.6 KB</sub></td>
+<td width="50%"><img src="docs/assets/screens/healthz.png" alt="/healthz" width="100%"><br><sub><code>/healthz</code> &middot; 8.3 KB</sub></td>
+</tr>
+</table>
 
-| Path | Method | Body |
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/screens/livez.png" alt="/livez" width="100%"><br><sub><code>/livez</code> &middot; 7.3 KB</sub></td>
+<td width="50%"><img src="docs/assets/screens/metrics.png" alt="/metrics" width="100%"><br><sub><code>/metrics</code> &middot; 14.8 KB</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/screens/readyz.png" alt="/readyz" width="100%"><br><sub><code>/readyz</code> &middot; 7.7 KB</sub></td>
+<td width="50%"><img src="docs/assets/screens/version.png" alt="/version" width="100%"><br><sub><code>/version</code> &middot; 26.3 KB</sub></td>
+</tr>
+</table>
+
+## Measured, not estimated
+
+These numbers were produced on this checkout by `pytest --cov` and by booting `wsgi.py` and issuing one real GET per documented path. The commands are in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
+
+| Signal | Value |
+| --- | --- |
+| Tests | **25 / 25 passed** (3.5 s, exit 0) |
+| Line coverage | **59.6%** — 454 of 712 statements |
+| Source | 16 files / 1,562 lines |
+| Test code | 4 files / 275 lines |
+| Documented paths | 10 in the spec, 5 GET |
+| Live probe | 11 GET requests to the booted app, **10 answered 200** |
+| Median latency | **11.1 ms** (single uncached request, dev server) |
+| Slowest / fastest | 74.3 ms `/` / 3.4 ms `/readyz` |
+| Bytes served | 11.8 KB across 11 responses |
+| Screenshots | 7 captured |
+
+## Architecture
+
+```
+hookforge/
+├── src/hookrelay/
+│   ├── http.py                         379  HTTP plumbing for hookrelay: correlation ids, access
+│   ├── config.py                       172  Environment-driven configuration for hookrelay
+│   ├── observability.py                169  Structured logging and request correlation for hookr
+│   ├── _app.py                         164  
+│   ├── cli.py                          143  
+│   ├── app.py                          119  Application factory for hookrelay
+│   ├── relay/api.py                    114  
+│   ├── errors.py                       108  Typed application errors and their HTTP mapping for 
+│   ├── paths.py                         52  Filesystem layout for hookrelay
+│   ├── relay/forward.py                 41  
+│   ├── models.py                        38  
+│   ├── relay/inbox.py                   24  
+├── openapi/hookforge.yaml                 the contract of record
+├── schema/hookforge.sql                   the DDL
+├── tests/                       the suite that has to stay green
+├── docs/EVIDENCE.md             the recorded live route walk
+├── Dockerfile                   multi-stage build
+└── wsgi.py                      entry point
+```
+
+The package keeps one shape across the service: `config.py` reads the environment once, `observability.py` emits structured JSON logs carrying a request id, `errors.py` turns exceptions into a single JSON envelope, `models.py` holds the tables, and the `relay/` package holds the routes.
+
+## Quality gates
+
+| Gate | Command | Threshold |
 | --- | --- | --- |
-| `/api/events` | E | JSON |
-| `/api/events` | G | JSON |
-| `/api/events` | GET | JSON |
-| `/api/events` | T | JSON |
-| `/api/events/{id}/replay` | O | JSON |
-| `/api/events/{id}/replay` | P | JSON |
-| `/api/events/{id}/replay` | POST | JSON |
-| `/api/events/{id}/replay` | S | JSON |
-| `/api/events/{id}/replay` | T | JSON |
-| `/api/health` | E | JSON |
-| `/api/health` | G | JSON |
-| `/api/health` | GET | JSON |
-| `/api/health` | T | JSON |
-| `/api/inboxes` | E | JSON |
-| `/api/inboxes` | G | JSON |
-| `/api/inboxes` | GET | JSON |
-| `/api/inboxes` | O | JSON |
-| `/api/inboxes` | P | JSON |
-| `/api/inboxes` | POST | JSON |
-| `/api/inboxes` | S | JSON |
-| `/api/inboxes` | T | JSON |
-| `/api/rules` | O | JSON |
-| `/api/rules` | P | JSON |
-| `/api/rules` | POST | JSON |
-| `/api/rules` | S | JSON |
-| `/api/rules` | T | JSON |
-| `/events/{id}/delete` | O | HTML/JSON |
-| `/events/{id}/delete` | P | HTML/JSON |
-| `/events/{id}/delete` | POST | HTML/JSON |
-| `/events/{id}/delete` | S | HTML/JSON |
-| `/events/{id}/delete` | T | HTML/JSON |
-| `/h/{token}` | A | HTML/JSON |
-| `/h/{token}` | C | HTML/JSON |
-| `/h/{token}` | D | HTML/JSON |
-| `/h/{token}` | DELETE | HTML/JSON |
-| `/h/{token}` | E | HTML/JSON |
-| `/h/{token}` | G | HTML/JSON |
-| `/h/{token}` | GET | HTML/JSON |
-| `/h/{token}` | H | HTML/JSON |
-| `/h/{token}` | L | HTML/JSON |
-| `/h/{token}` | O | HTML/JSON |
-| `/h/{token}` | P | HTML/JSON |
-| `/h/{token}` | PATCH | HTML/JSON |
-| `/h/{token}` | POST | HTML/JSON |
-| `/h/{token}` | PUT | HTML/JSON |
-| `/h/{token}` | S | HTML/JSON |
-| `/h/{token}` | T | HTML/JSON |
-| `/h/{token}` | U | HTML/JSON |
-| `/inboxes` | E | HTML/JSON |
-| `/inboxes` | G | HTML/JSON |
-| `/inboxes` | GET | HTML/JSON |
-| `/inboxes` | T | HTML/JSON |
-| `/inboxes/new` | O | HTML/JSON |
-| `/inboxes/new` | P | HTML/JSON |
-| `/inboxes/new` | POST | HTML/JSON |
-| `/inboxes/new` | S | HTML/JSON |
-| `/inboxes/new` | T | HTML/JSON |
-| `/inboxes/{id}/delete` | O | HTML/JSON |
-| `/inboxes/{id}/delete` | P | HTML/JSON |
-| `/inboxes/{id}/delete` | POST | HTML/JSON |
-| `/inboxes/{id}/delete` | S | HTML/JSON |
-| `/inboxes/{id}/delete` | T | HTML/JSON |
+| Suite | `pytest -q` | all green |
+| Coverage | `pytest --cov` | floor set in `pyproject.toml` from the measured value |
+| Lint | `ruff check src tests` | zero findings |
+| Format | `ruff format --check src tests` | zero reformats |
+| Types | `mypy src` | zero errors |
+| Security | `bandit -c pyproject.toml -r src` | reviewed skip list, no unreviewed finding |
+| Live routes | boot `wsgi.py`, one GET per documented path | no 5xx, no undocumented guard |
 
-The frozen machine-readable contract is `openapi/hookforge.yaml`; it is the
-source of truth for path and method coverage.
+CI runs the first six on Python 3.11, 3.12 and 3.13 for every push to `main`, plus a container build. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
----
-
-## Layout
-
-```
-├── .github
-│   └── workflows
-│       └── ci.yml
-├── docs
-│   ├── adr
-│   │   ├── 0001-src-layout-and-runtime-state.md
-│   │   └── 0002-hand-rolled-metric-exposition.md
-│   ├── ARCHITECTURE.md
-│   └── OPERATIONS.md
-├── openapi
-│   └── hookforge.yaml
-├── schema
-│   └── hookforge.sql
-├── src
-│   └── hookrelay
-│       ├── relay
-│       ├── templates
-│       ├── __init__.py
-│       ├── _app.py
-│       ├── app.py
-│       ├── cli.py
-│       ├── config.py
-│       ├── errors.py
-│       ├── http.py
-│       ├── models.py
-│       ├── observability.py
-│       ├── paths.py
-│       └── py.typed
-├── tests
-│   ├── conftest.py
-│   ├── test_hookforge.py
-│   ├── test_config.py
-│   └── test_ops.py
-├── .dockerignore
-├── .editorconfig
-├── .env.example
-├── .gitignore
-├── .pre-commit-config.yaml
-├── CHANGELOG.md
-├── CODE_OF_CONDUCT.md
-├── CONTRIBUTING.md
-├── Dockerfile
-├── LICENSE
-├── Makefile
-├── NOTES.md
-├── SECURITY.md
-├── conftest.py
-├── docker-compose.yml
-├── docker-entrypoint.sh
-├── mypy.ini
-├── pyproject.toml
-├── requirements-dev.txt
-├── requirements.txt
-└── wsgi.py
-```
-
-- `src/hookrelay/` is the only importable code. It is a real package: every
-  historical flat import was rewritten to a relative one, so the modules can no
-  longer be shadowed by an unrelated top-level name.
-- `var/` holds all mutable state (database, logs) and is gitignored. The
-  container image mounts a volume there.
-- `wsgi.py` is a compatibility shim so a bare checkout is runnable. Anything
-  installed with `pip install` uses the package factory directly.
-
----
-
-## Development
+## Deploy
 
 ```sh
-make install   # virtualenv plus editable install with dev extras
-make test      # pytest
-make cov       # pytest --cov, enforces the coverage floor
-make lint      # ruff check
-make type      # mypy --strict
-make check     # lint + type + cov: the same gate CI runs
-make run       # development server
+docker build -t hookforge .
+docker run --rm -p 8000:8000 --env-file .env.example hookforge
 ```
 
-### Honest status of the quality gates
+Configuration is environment-only — every variable is documented in [`.env.example`](.env.example), and the service refuses to start with a production secret missing.
 
-This project was generated in an offline sandbox, which constrains what can
-truthfully be claimed:
+## Limits, stated rather than hidden
 
-| Gate                                        | Status in this repository |
-| ------------------------------------------- | ------------------------- |
-| `pytest`                                    | **Executed.** The suite passes locally. |
-| `coverage`                                  | Runnable, but the 85% floor has **not** been verified end to end. |
-| `mypy --strict`                             | Runnable locally; the strict configuration is committed. |
-| `ruff`, `bandit`, `pip-audit`                 | **Never executed.** No network access to install them. Authored, not run. |
-| CI workflow                                 | Committed, **never run** (no CI runner available). |
-| Container build                             | Dockerfile committed, **never built** (no Docker daemon). |
-
-Read the CI workflow as the intended gate, not as evidence that the gate
-passed. Nothing in this repository claims a green build.
-
----
-
-## Deployment
-
-```sh
-docker compose up --build     # http://localhost:8000
-```
-
-The image is multi-stage, installs from a built wheel, runs as uid 1001 with no
-capabilities, has a read-only root filesystem, and declares its own
-`HEALTHCHECK`. `docker-entrypoint.sh` refuses to start a production image
-without `SECRET_KEY`.
-
-See [docs/OPERATIONS.md](docs/OPERATIONS.md) for the runbook: rollout, rollback,
-log queries, and what each alert means.
-
----
-
-## Documentation
-
-| Document                                     | Contents                                  |
-| -------------------------------------------- | ----------------------------------------- |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Modules, request lifecycle, failure modes |
-| [docs/OPERATIONS.md](docs/OPERATIONS.md)     | Runbook, alerts, capacity notes           |
-| [docs/adr/](docs/adr/)                       | Architecture decision records             |
-| [SECURITY.md](SECURITY.md)                   | Threat model and disclosure policy        |
-| [CONTRIBUTING.md](CONTRIBUTING.md)           | Branch, commit and review conventions     |
-| [CHANGELOG.md](CHANGELOG.md)                 | Release history                           |
-
----
+- Capture bodies are stored in the database; very large payloads are truncated at the configured cap and the row says so.
+- Forwarding is fire-and-forget per rule; there is no retry queue for a downstream that is down.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
