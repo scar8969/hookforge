@@ -34,7 +34,7 @@ RUN groupadd --system --gid 1001 app \
 WORKDIR /app
 
 COPY --from=builder /wheels /wheels
-RUN python -m pip install --no-cache-dir --no-index --find-links=/wheels b1-hookrelay \
+RUN python -m pip install --no-cache-dir --no-index --find-links=/wheels hookforge \
  && rm -rf /wheels \
  && mkdir -p /var/lib/hookrelay/instance /var/lib/hookrelay/log \
  && chown -R app:app /var/lib/hookrelay /app

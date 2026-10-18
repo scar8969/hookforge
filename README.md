@@ -1,4 +1,4 @@
-# 📡 hookrelay
+# hookforge
 
 > Webhook relay and debugger. Point any service's webhook at
 
@@ -6,8 +6,8 @@
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-b1_hookrelay is a Flask service delivered as an installable, typed, test-covered
-distribution. The business logic is unchanged from the original skeleton; what
+hookforge is a Flask service delivered as an installable, typed, test-covered
+distribution. The business logic is unchanged from the original service; what
 is new is the engineering around it: a packaging story, a configuration
 contract, structured observability, operational endpoints, a hardened
 container, and the gates that keep all of that true.
@@ -17,7 +17,7 @@ container, and the gates that keep all of that true.
 ## Quickstart
 
 ```sh
-git clone <your-fork> b1_hookrelay && cd b1_hookrelay
+git clone <your-fork> hookforge && cd hookforge
 python -m venv .venv
 . .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
@@ -172,7 +172,7 @@ variable, rather than surfacing as a confusing runtime error later.
 | `/inboxes/{id}/delete` | S | HTML/JSON |
 | `/inboxes/{id}/delete` | T | HTML/JSON |
 
-The frozen machine-readable contract is `openapi/b1_hookrelay.yaml`; it is the
+The frozen machine-readable contract is `openapi/hookforge.yaml`; it is the
 source of truth for path and method coverage.
 
 ---
@@ -190,9 +190,9 @@ source of truth for path and method coverage.
 │   ├── ARCHITECTURE.md
 │   └── OPERATIONS.md
 ├── openapi
-│   └── b1_hookrelay.yaml
+│   └── hookforge.yaml
 ├── schema
-│   └── b1_hookrelay.sql
+│   └── hookforge.sql
 ├── src
 │   └── hookrelay
 │       ├── relay
@@ -210,7 +210,7 @@ source of truth for path and method coverage.
 │       └── py.typed
 ├── tests
 │   ├── conftest.py
-│   ├── test_b1_hookrelay.py
+│   ├── test_hookforge.py
 │   ├── test_config.py
 │   └── test_ops.py
 ├── .dockerignore

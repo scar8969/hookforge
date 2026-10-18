@@ -3,13 +3,13 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "b1-hookrelay"
+name = "hookforge"
 version = "0.1.0"
-description = "Webhook relay and debugger. Point any service's webhook at"
+description = "Webhook relay and debugger: point any service at an inbox, inspect every delivery, replay on demand."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "project-skeletons maintainers" }]
+authors = [{ name = "Priyanshu Rout" }]
 keywords = ["flask", "service", "hookrelay"]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -46,7 +46,7 @@ Documentation = "https://example.invalid/hookrelay/docs"
 Issues = "https://example.invalid/hookrelay/issues"
 
 [project.scripts]
-b1-hookrelay = "hookrelay.cli:main"
+hookforge = "hookrelay.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

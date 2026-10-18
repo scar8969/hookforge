@@ -1,4 +1,4 @@
-"""B1 hookrelay — tests. Run: pytest test_b1_hookrelay.py"""
+"""B1 hookrelay — tests. Run: pytest test_hookforge.py"""
 import sys, os, json
 
 import pytest
