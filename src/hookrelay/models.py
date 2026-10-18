@@ -1,7 +1,9 @@
 from datetime import datetime
+
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
+
 
 class Inbox(db.Model):
     __tablename__ = "inboxes"
@@ -9,6 +11,7 @@ class Inbox(db.Model):
     token = db.Column(db.String(16), unique=True)
     name = db.Column(db.String(64), default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class Event(db.Model):
     __tablename__ = "events"
@@ -22,6 +25,7 @@ class Event(db.Model):
     ms = db.Column(db.Integer, default=0)
     ip = db.Column(db.String(64), default="")
     at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class Rule(db.Model):
     __tablename__ = "rules"

@@ -1,10 +1,14 @@
-import argparse, json, os, sys
-from . import paths
+import argparse
+import json
+import sys
+
 
 def _app():
     """Import the Flask app lazily so --help works before the web deps load."""
     from ._app import app
+
     return app
+
 
 def cmd_inbox_create(args):
     from .relay.inbox import create_inbox
@@ -15,23 +19,32 @@ def cmd_inbox_create(args):
         print(inbox.token)
     return 0
 
+
 def cmd_inboxes(args):
     from .models import Event, Inbox, Rule
 
     app = _app()
     with app.app_context():
-        rows = [{"id": i.id, "name": i.name, "token": i.token,
-                 "events": Event.query.filter_by(inbox_id=i.id).count(),
-                 "rules": Rule.query.filter_by(inbox_id=i.id).count()}
-                for i in Inbox.query.order_by(Inbox.id.desc()).all()]
+        rows = [
+            {
+                "id": i.id,
+                "name": i.name,
+                "token": i.token,
+                "events": Event.query.filter_by(inbox_id=i.id).count(),
+                "rules": Rule.query.filter_by(inbox_id=i.id).count(),
+            }
+            for i in Inbox.query.order_by(Inbox.id.desc()).all()
+        ]
     if args.json:
         print(json.dumps(rows, indent=2))
     else:
         for r in rows:
-            print("#%-4s %-20s %-10s events=%-5s rules=%s"
-                  % (r["id"], r["name"] or "(unnamed)", r["token"],
-                     r["events"], r["rules"]))
+            print(
+                "#%-4s %-20s %-10s events=%-5s rules=%s"
+                % (r["id"], r["name"] or "(unnamed)", r["token"], r["events"], r["rules"])
+            )
     return 0
+
 
 def cmd_events(args):
     from .models import Event, Inbox
@@ -44,22 +57,37 @@ def cmd_events(args):
             return 2
         q = Event.query.filter_by(inbox_id=inbox.id).order_by(Event.id.desc())
         if args.q:
-            rows = [e for e in q.limit(200).all()
-                    if args.q in (e.body or "") or args.q in (e.path or "")]
+            rows = [
+                e
+                for e in q.limit(200).all()
+                if args.q in (e.body or "") or args.q in (e.path or "")
+            ]
         else:
             rows = q.limit(args.limit).all()
-        rows = rows[:args.limit]
-        out = [{"id": e.id, "method": e.method, "path": e.path, "status": e.status,
-                "ms": e.ms, "ip": e.ip,
-                "at": e.at.isoformat() if e.at else "", "body": e.body}
-               for e in rows]
+        rows = rows[: args.limit]
+        out = [
+            {
+                "id": e.id,
+                "method": e.method,
+                "path": e.path,
+                "status": e.status,
+                "ms": e.ms,
+                "ip": e.ip,
+                "at": e.at.isoformat() if e.at else "",
+                "body": e.body,
+            }
+            for e in rows
+        ]
     if args.json:
         print(json.dumps(out, indent=2))
     else:
         for e in out:
-            print("#%-4s %-6s %-30s %s %sms %s"
-                  % (e["id"], e["method"], e["path"], e["status"], e["ms"], e["at"]))
+            print(
+                "#%-4s %-6s %-30s %s %sms %s"
+                % (e["id"], e["method"], e["path"], e["status"], e["ms"], e["at"])
+            )
     return 0
+
 
 def cmd_replay(args):
     from .models import Event, Rule
@@ -80,9 +108,12 @@ def cmd_replay(args):
         for rule in matched:
             good, detail = forward(rule, event)
             ok = ok and good
-            print("rule #%d -> %s : %s (%s)"
-                  % (rule.id, rule.forward_url, "ok" if good else "failed", detail))
+            print(
+                "rule #%d -> %s : %s (%s)"
+                % (rule.id, rule.forward_url, "ok" if good else "failed", detail)
+            )
     return 0 if ok else 1
+
 
 def main():
     p = argparse.ArgumentParser(prog="hookrelay", description="webhook relay + debugger")
@@ -92,8 +123,10 @@ def main():
     l = sub.add_parser("inboxes", help="list inboxes")
     l.add_argument("--json", action="store_true")
     e = sub.add_parser("events", help="list captured events for one inbox")
-    e.add_argument("inbox"); e.add_argument("--limit", type=int, default=20)
-    e.add_argument("--q", default=""); e.add_argument("--json", action="store_true")
+    e.add_argument("inbox")
+    e.add_argument("--limit", type=int, default=20)
+    e.add_argument("--q", default="")
+    e.add_argument("--json", action="store_true")
     r = sub.add_parser("replay", help="re-deliver an event to its matching rules")
     r.add_argument("event_id", type=int)
     args = p.parse_args()

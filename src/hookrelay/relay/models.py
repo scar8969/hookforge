@@ -11,6 +11,7 @@ New code in this package should import from the root module directly:
 
     from models import Event, db
 """
-from ..models import Event, Inbox, Rule, db  # noqa: F401
 
-__all__ = ["db", "Inbox", "Event", "Rule"]
+from ..models import Event, Inbox, Rule, db
+
+__all__ = ["Event", "Inbox", "Rule", "db"]

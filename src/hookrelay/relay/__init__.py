@@ -17,6 +17,7 @@ package is
 and NOT 'from . import db', which would look for a non-existent relay/db.py.
 The handle is re-exported here only so 'from relay import db' keeps working.
 """
-from ..models import Event, Inbox, Rule, db  # noqa: F401
 
-__all__ = ["db", "Inbox", "Event", "Rule"]
+from ..models import Event, Inbox, Rule, db
+
+__all__ = ["Event", "Inbox", "Rule", "db"]

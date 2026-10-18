@@ -1,23 +1,25 @@
+import ast
+import json
+import os
+
+from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
+
+from . import paths
 from .models import Event, Inbox, Rule, db
 from .relay.api import bp
-from .relay.forward import forward, match
 from .relay.inbox import create_inbox
-
-import ast, json, os
-from . import paths
-
-from flask import (Flask, flash, jsonify, redirect, render_template, request,
-                   url_for)
 
 # Templates live next to the project root, not under web/. Without an explicit
 # template_folder Flask searches web/templates and every render raises
 # TemplateNotFound (HTTP 500).
 paths.ensure_runtime_dirs()
 
+
 def build_app():
     """Build the application: configuration, database, then routes."""
-    app = Flask(__name__, template_folder=str(paths.TEMPLATES_DIR),
-                instance_path=str(paths.INSTANCE_DIR))
+    app = Flask(
+        __name__, template_folder=str(paths.TEMPLATES_DIR), instance_path=str(paths.INSTANCE_DIR)
+    )
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + str(paths.INSTANCE_DIR / "hookrelay.db")
     app.secret_key = os.environ.get("SECRET_KEY", "hookrelay-dev")
     db.init_app(app)
@@ -48,17 +50,28 @@ def build_app():
     def _inbox_rows():
         rows = []
         for i in Inbox.query.order_by(Inbox.id.desc()).all():
-            rows.append({"id": i.id, "token": i.token, "name": i.name or "(unnamed)",
-                         "created_at": i.created_at,
-                         "events": Event.query.filter_by(inbox_id=i.id).count(),
-                         "rules": Rule.query.filter_by(inbox_id=i.id).count()})
+            rows.append(
+                {
+                    "id": i.id,
+                    "token": i.token,
+                    "name": i.name or "(unnamed)",
+                    "created_at": i.created_at,
+                    "events": Event.query.filter_by(inbox_id=i.id).count(),
+                    "rules": Rule.query.filter_by(inbox_id=i.id).count(),
+                }
+            )
         return rows
 
     @app.get("/api/health")
     def health():
-        return jsonify({"status": "ok", "inboxes": Inbox.query.count(),
-                        "events": Event.query.count(),
-                        "rules": Rule.query.count()})
+        return jsonify(
+            {
+                "status": "ok",
+                "inboxes": Inbox.query.count(),
+                "events": Event.query.count(),
+                "rules": Rule.query.count(),
+            }
+        )
 
     @app.get("/")
     def index():
@@ -78,26 +91,45 @@ def build_app():
         for e in query.order_by(Event.id.desc()).limit(50).all():
             if q and q not in (e.body or "") and q not in (e.path or ""):
                 continue
-            rows.append({"id": e.id, "method": e.method, "path": e.path, "status": e.status,
-                         "ms": e.ms, "ip": e.ip, "at": e.at,
-                         "headers": _pretty_headers(e.headers_json),
-                         "body": (e.body or "")[:400],
-                         "truncated": len(e.body or "") > 400})
+            rows.append(
+                {
+                    "id": e.id,
+                    "method": e.method,
+                    "path": e.path,
+                    "status": e.status,
+                    "ms": e.ms,
+                    "ip": e.ip,
+                    "at": e.at,
+                    "headers": _pretty_headers(e.headers_json),
+                    "body": (e.body or "")[:400],
+                    "truncated": len(e.body or "") > 400,
+                }
+            )
 
-        counts = {"inboxes": Inbox.query.count(),
-                  "events": Event.query.count() if current is None
-                  else Event.query.filter_by(inbox_id=current.id).count(),
-                  "rules": Rule.query.count() if current is None
-                  else Rule.query.filter_by(inbox_id=current.id).count()}
-        return render_template("index.html", inboxes=inboxes, events=rows,
-                               current=current, counts=counts, q=q)
+        counts = {
+            "inboxes": Inbox.query.count(),
+            "events": Event.query.count()
+            if current is None
+            else Event.query.filter_by(inbox_id=current.id).count(),
+            "rules": Rule.query.count()
+            if current is None
+            else Rule.query.filter_by(inbox_id=current.id).count(),
+        }
+        return render_template(
+            "index.html", inboxes=inboxes, events=rows, current=current, counts=counts, q=q
+        )
 
     @app.get("/inboxes")
     def inboxes_page():
-        return render_template("inboxes.html", inboxes=_inbox_rows(),
-                               counts={"inboxes": Inbox.query.count(),
-                                       "events": Event.query.count(),
-                                       "rules": Rule.query.count()})
+        return render_template(
+            "inboxes.html",
+            inboxes=_inbox_rows(),
+            counts={
+                "inboxes": Inbox.query.count(),
+                "events": Event.query.count(),
+                "rules": Rule.query.count(),
+            },
+        )
 
     @app.post("/inboxes/new")
     def new_inbox():
@@ -126,5 +158,6 @@ def build_app():
         return redirect(url_for("inboxes_page"))
 
     return app
+
 
 app = build_app()
