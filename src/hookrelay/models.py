@@ -1,6 +1,6 @@
-from datetime import datetime
-
 from flask_sqlalchemy import SQLAlchemy
+
+from .clock import utcnow
 
 db = SQLAlchemy()
 
@@ -10,7 +10,7 @@ class Inbox(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     token = db.Column(db.String(16), unique=True)
     name = db.Column(db.String(64), default="")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class Event(db.Model):
@@ -24,7 +24,7 @@ class Event(db.Model):
     status = db.Column(db.Integer, default=200)
     ms = db.Column(db.Integer, default=0)
     ip = db.Column(db.String(64), default="")
-    at = db.Column(db.DateTime, default=datetime.utcnow)
+    at = db.Column(db.DateTime, default=utcnow)
 
 
 class Rule(db.Model):
