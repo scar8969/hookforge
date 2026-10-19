@@ -4,7 +4,7 @@ Every line below was produced by a command run against this exact checkout, on t
 
 | | |
 | --- | --- |
-| Generated | 2026-10-19 02:23 |
+| Generated | 2026-10-19 09:41 |
 | Python | 3.14.7 |
 | Platform | Windows 11 |
 
@@ -15,7 +15,7 @@ python -m pytest -q
 ```
 
 - exit code **0**
-- 25 passed in 1.46s
+- 25 passed in 1.24s
 
 ## Static gates
 
@@ -39,6 +39,24 @@ The application was imported through `wsgi.py` and each GET path declared in `op
 | 200 | `/inboxes` | 5097 | text/html |
 
 5 paths walked, 0 of them raised or answered 5xx.
+
+## CLI
+
+```
+usage: hookrelay [-h] {inbox-create,inboxes,events,replay} ...
+
+webhook relay + debugger
+
+positional arguments:
+  {inbox-create,inboxes,events,replay}
+    inbox-create        create an inbox and print its token
+    inboxes             list inboxes
+    events              list captured events for one inbox
+    replay              re-deliver an event to its matching rules
+
+options:
+  -h, --help            show this help message and exit
+```
 
 ## Screenshots
 
